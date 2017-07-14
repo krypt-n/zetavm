@@ -97,7 +97,8 @@ enum Opcode : uint16_t
     THROW,
 
     IMPORT,
-    ABORT
+    ABORT,
+    MAX_OPCODE
 };
 
 /// Inline cache to speed up property lookups
@@ -272,6 +273,11 @@ uint8_t* instrPtr = nullptr;
 /// Cache of all possible one-character string values
 Value charStrings[256];
 
+static void* opcodeLabels[MAX_OPCODE];
+
+Value execCode(bool initLabels = false);
+
+
 /// Write a value to the code heap
 template <typename T> void writeCode(T val)
 {
@@ -279,6 +285,14 @@ template <typename T> void writeCode(T val)
     T* heapPtr = (T*)codeHeapAlloc;
     *heapPtr = val;
     codeHeapAlloc += sizeof(T);
+    assert (codeHeapAlloc <= codeHeapLimit);
+}
+
+void writeCode(Opcode op)
+{
+    void** heapPtr = (void**)codeHeapAlloc;
+    *heapPtr = opcodeLabels[op];
+    codeHeapAlloc += sizeof(void*);
     assert (codeHeapAlloc <= codeHeapLimit);
 }
 
@@ -382,6 +396,8 @@ void initInterp()
     stackLimit = new Value[STACK_INIT_SIZE];
     stackBase = stackLimit + STACK_INIT_SIZE;
     stackPtr = stackBase;
+
+    execCode(true);
 }
 
 /// Get a version of a block. This version will be a stub
@@ -1248,32 +1264,121 @@ void throwExc(
     }
 }
 
+
+#define THREADED
+
 #ifdef THREADED
 #define JOIN(x, y) x##y
-#define NEXT() goto readCode<void*>()
+#define NEXT() goto *readCode<void*>()
 #define LABEL(L) JOIN(label, L)
+#define REGISTERLABEL(L) opcodeLabels[L] = &&LABEL(L)
 #else
 #define NEXT() break
 #define LABEL(L) case L
 #endif
 
 /// Start/continue execution beginning at a current instruction
-Value execCode()
+__attribute__((__noinline__,__noclone__)) 
+Value execCode(bool initLabels)
 {
+    if (initLabels) {
+        REGISTERLABEL(GET_LOCAL);
+        REGISTERLABEL(SET_LOCAL);
+
+        REGISTERLABEL(PUSH);
+        REGISTERLABEL(POP);
+        REGISTERLABEL(DUP);
+        REGISTERLABEL(SWAP);
+
+        REGISTERLABEL(ADD_I32);
+        REGISTERLABEL(SUB_I32);
+        REGISTERLABEL(MUL_I32);
+        REGISTERLABEL(DIV_I32);
+        REGISTERLABEL(MOD_I32);
+        REGISTERLABEL(SHL_I32);
+        REGISTERLABEL(SHR_I32);
+        REGISTERLABEL(USHR_I32);
+        REGISTERLABEL(AND_I32);
+        REGISTERLABEL(OR_I32);
+        REGISTERLABEL(XOR_I32);
+        REGISTERLABEL(NOT_I32);
+        REGISTERLABEL(LT_I32);
+        REGISTERLABEL(LE_I32);
+        REGISTERLABEL(GT_I32);
+        REGISTERLABEL(GE_I32);
+        REGISTERLABEL(EQ_I32);
+
+        REGISTERLABEL(ADD_F32);
+        REGISTERLABEL(SUB_F32);
+        REGISTERLABEL(MUL_F32);
+        REGISTERLABEL(DIV_F32);
+        REGISTERLABEL(LT_F32);
+        REGISTERLABEL(LE_F32);
+        REGISTERLABEL(GT_F32);
+        REGISTERLABEL(GE_F32);
+        REGISTERLABEL(EQ_F32);
+        REGISTERLABEL(SIN_F32);
+        REGISTERLABEL(COS_F32);
+        REGISTERLABEL(SQRT_F32);
+
+        REGISTERLABEL(I32_TO_F32);
+        REGISTERLABEL(I32_TO_STR);
+        REGISTERLABEL(F32_TO_I32);
+        REGISTERLABEL(F32_TO_STR);
+        REGISTERLABEL(STR_TO_F32);
+
+        REGISTERLABEL(EQ_BOOL);
+        REGISTERLABEL(HAS_TAG);
+        REGISTERLABEL(GET_TAG);
+
+        REGISTERLABEL(STR_LEN);
+        REGISTERLABEL(GET_CHAR);
+        REGISTERLABEL(GET_CHAR_CODE);
+        REGISTERLABEL(CHAR_TO_STR);
+        REGISTERLABEL(STR_CAT);
+        REGISTERLABEL(EQ_STR);
+
+        REGISTERLABEL(NEW_OBJECT);
+        REGISTERLABEL(HAS_FIELD);
+        REGISTERLABEL(SET_FIELD);
+        REGISTERLABEL(GET_FIELD);
+        REGISTERLABEL(GET_FIELD_LIST);
+        REGISTERLABEL(EQ_OBJ);
+
+        REGISTERLABEL(NEW_ARRAY);
+        REGISTERLABEL(ARRAY_LEN);
+        REGISTERLABEL(ARRAY_PUSH);
+        REGISTERLABEL(GET_ELEM);
+        REGISTERLABEL(SET_ELEM);
+
+        REGISTERLABEL(JUMP);
+        REGISTERLABEL(JUMP_STUB);
+        REGISTERLABEL(IF_TRUE);
+        REGISTERLABEL(CALL);
+        REGISTERLABEL(RET);
+        REGISTERLABEL(THROW);
+
+        REGISTERLABEL(IMPORT);
+        REGISTERLABEL(ABORT);
+        return Value::TRUE;
+    }
     assert (instrPtr >= codeHeap);
     assert (instrPtr < codeHeapLimit);
 
+    //void** op = nullptr;
+    NEXT();
+
     // For each instruction to execute
-    for (;;)
-    {
-        auto& op = readCode<Opcode>();
+    /* for (;;) */
+    /* { */
+    /*     auto& op = readCode<Opcode>(); */
 
-        //std::cout << "instr" << std::endl;
-        //std::cout << "op=" << (int)op << std::endl;
-        //std::cout << "  stack space: " << (stackBase - stackPtr) << std::endl;
+    /*     //std::cout << "instr" << std::endl; */
+    /*     //std::cout << "op=" << (int)op << std::endl; */
+    /*     //std::cout << "  stack space: " << (stackBase - stackPtr) << std::endl; */
 
-        switch (op)
-        {
+    /*     switch (op) */
+    /*     { */
             LABEL(PUSH):
             {
                 auto val = readCode<Value>();
@@ -1880,7 +1985,7 @@ Value execCode()
                     {
                         // The jump is redundant, so we will write the
                         // next block over this jump instruction
-                        instrPtr = codeHeapAlloc = (uint8_t*)&op;
+                        instrPtr = codeHeapAlloc = (uint8_t*)((void**) instrPtr - 2);
                     }
 
                     compile(dstVer);
@@ -1888,7 +1993,8 @@ Value execCode()
                 else
                 {
                     // Patch the jump
-                    op = JUMP;
+                    *(((void**) instrPtr) - 2) = opcodeLabels[JUMP];
+                    //*op = opcodeLabels[JUMP];
                     dstAddr = dstVer->startPtr;
 
                     // Jump to the target
@@ -1963,7 +2069,7 @@ Value execCode()
                 if (callee.isObject())
                 {
                     funCall(
-                        (uint8_t*)&op,
+                        (uint8_t*)instrPtr,
                         callee,
                         callInfo
                     );
@@ -1971,7 +2077,7 @@ Value execCode()
                 else if (callee.isHostFn())
                 {
                     hostCall(
-                        (uint8_t*)&op,
+                        (uint8_t*)instrPtr,
                         callee,
                         callInfo.numArgs,
                         callInfo.retVer
@@ -2036,7 +2142,7 @@ Value execCode()
             {
                 // Pop the exception value
                 auto excVal = popVal();
-                throwExc((uint8_t*)&op, excVal);
+                throwExc((uint8_t*)(((void**)instrPtr) - 1), excVal);
             }
             NEXT();
 
@@ -2052,7 +2158,7 @@ Value execCode()
             {
                 auto errMsg = (std::string)popStr();
 
-                auto srcPos = getSrcPos((uint8_t*)&op);
+                auto srcPos = getSrcPos((uint8_t*)instrPtr);
                 if (srcPos != Value::UNDEF)
                     std::cout << posToString(srcPos) << " - ";
 
@@ -2070,11 +2176,11 @@ Value execCode()
             }
             NEXT();
 
-            default:
-            assert (false && "unhandled instruction in interpreter loop");
-        }
+            /* default: */
+            /* assert (false && "unhandled instruction in interpreter loop"); */
+        /* } */
 
-    }
+    /* } */
 
     assert (false);
 }
