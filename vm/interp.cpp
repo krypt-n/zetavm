@@ -1248,6 +1248,15 @@ void throwExc(
     }
 }
 
+#ifdef THREADED
+#define JOIN(x, y) x##y
+#define NEXT() goto readCode<void*>()
+#define LABEL(L) JOIN(label, L)
+#else
+#define NEXT() break
+#define LABEL(L) case L
+#endif
+
 /// Start/continue execution beginning at a current instruction
 Value execCode()
 {
@@ -1265,49 +1274,49 @@ Value execCode()
 
         switch (op)
         {
-            case PUSH:
+            LABEL(PUSH):
             {
                 auto val = readCode<Value>();
                 pushVal(val);
             }
-            break;
+            NEXT();
 
-            case POP:
+            LABEL(POP):
             {
                 popVal();
             }
-            break;
+            NEXT();
 
-            case DUP:
+            LABEL(DUP):
             {
                 // Read the index of the value to duplicate
                 auto idx = readCode<uint16_t>();
                 auto val = stackPtr[idx];
                 pushVal(val);
             }
-            break;
+            NEXT();
 
             // Swap the topmost two stack elements
-            case SWAP:
+            LABEL(SWAP):
             {
                 auto v0 = popVal();
                 auto v1 = popVal();
                 pushVal(v0);
                 pushVal(v1);
             }
-            break;
+            NEXT();
 
             // Set a local variable
-            case SET_LOCAL:
+            LABEL(SET_LOCAL):
             {
                 auto localIdx = readCode<uint16_t>();
                 //std::cout << "set localIdx=" << localIdx << std::endl;
                 assert (stackPtr > stackLimit);
                 framePtr[-localIdx] = popVal();
             }
-            break;
+            NEXT();
 
-            case GET_LOCAL:
+            LABEL(GET_LOCAL):
             {
                 // Read the index of the value to push
                 auto localIdx = readCode<uint16_t>();
@@ -1316,279 +1325,279 @@ Value execCode()
                 auto val = framePtr[-localIdx];
                 pushVal(val);
             }
-            break;
+            NEXT();
 
             //
             // Integer operations
             //
 
-            case ADD_I32:
+            LABEL(ADD_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 + arg1));
             }
-            break;
+            NEXT();
 
-            case SUB_I32:
+            LABEL(SUB_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 - arg1));
             }
-            break;
+            NEXT();
 
-            case MUL_I32:
+            LABEL(MUL_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 * arg1));
             }
-            break;
+            NEXT();
 
-            case DIV_I32:
+            LABEL(DIV_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 / arg1));
             }
-            break;
+            NEXT();
 
-            case MOD_I32:
+            LABEL(MOD_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 % arg1));
             }
-            break;
+            NEXT();
 
-            case SHL_I32:
+            LABEL(SHL_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 << arg1));
             }
-            break;
+            NEXT();
 
-            case SHR_I32:
+            LABEL(SHR_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 >> arg1));
             }
-            break;
+            NEXT();
 
-            case USHR_I32:
+            LABEL(USHR_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = (uint32_t)popInt32();
                 pushVal(Value::int32((int32_t)(arg0 >> arg1)));
             }
-            break;
+            NEXT();
 
-            case AND_I32:
+            LABEL(AND_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 & arg1));
             }
-            break;
+            NEXT();
 
-            case OR_I32:
+            LABEL(OR_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 | arg1));
             }
-            break;
+            NEXT();
 
-            case XOR_I32:
+            LABEL(XOR_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushVal(Value::int32(arg0 ^ arg1));
             }
-            break;
+            NEXT();
 
-            case NOT_I32:
+            LABEL(NOT_I32):
             {
                 auto arg0 = popInt32();
                 pushVal(Value::int32(~arg0));
             }
-            break;
+            NEXT();
 
-            case LT_I32:
+            LABEL(LT_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushBool(arg0 < arg1);
             }
-            break;
+            NEXT();
 
-            case LE_I32:
+            LABEL(LE_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushBool(arg0 <= arg1);
             }
-            break;
+            NEXT();
 
-            case GT_I32:
+            LABEL(GT_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushBool(arg0 > arg1);
             }
-            break;
+            NEXT();
 
-            case GE_I32:
+            LABEL(GE_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushBool(arg0 >= arg1);
             }
-            break;
+            NEXT();
 
-            case EQ_I32:
+            LABEL(EQ_I32):
             {
                 auto arg1 = popInt32();
                 auto arg0 = popInt32();
                 pushBool(arg0 == arg1);
             }
-            break;
+            NEXT();
 
             //
             // Floating-point operations
             //
 
-            case ADD_F32:
+            LABEL(ADD_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushVal(Value::float32(arg0 + arg1));
             }
-            break;
+            NEXT();
 
-            case SUB_F32:
+            LABEL(SUB_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushVal(Value::float32(arg0 - arg1));
             }
-            break;
+            NEXT();
 
-            case MUL_F32:
+            LABEL(MUL_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushVal(Value::float32(arg0 * arg1));
             }
-            break;
+            NEXT();
 
-            case DIV_F32:
+            LABEL(DIV_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushVal(Value::float32(arg0 / arg1));
             }
-            break;
+            NEXT();
 
-            case LT_F32:
+            LABEL(LT_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushBool(arg0 < arg1);
             }
-            break;
+            NEXT();
 
-            case LE_F32:
+            LABEL(LE_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushBool(arg0 <= arg1);
             }
-            break;
+            NEXT();
 
-            case GT_F32:
+            LABEL(GT_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushBool(arg0 > arg1);
             }
-            break;
+            NEXT();
 
-            case GE_F32:
+            LABEL(GE_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushBool(arg0 >= arg1);
             }
-            break;
+            NEXT();
 
-            case EQ_F32:
+            LABEL(EQ_F32):
             {
                 auto arg1 = popFloat32();
                 auto arg0 = popFloat32();
                 pushBool(arg0 == arg1);
             }
-            break;
+            NEXT();
 
-            case SIN_F32:
+            LABEL(SIN_F32):
             {
                 float arg = popFloat32();
                 pushVal(Value::float32(sin(arg)));
             }
-            break;
+            NEXT();
 
-            case COS_F32:
+            LABEL(COS_F32):
             {
                 float arg = popFloat32();
                 pushVal(Value::float32(cos(arg)));
             }
-            break;
+            NEXT();
 
-            case SQRT_F32:
+            LABEL(SQRT_F32):
             {
                 float arg = popFloat32();
                 pushVal(Value::float32(sqrt(arg)));
             }
-            break;
+            NEXT();
 
             //
             // Conversion operations
             //
 
-            case I32_TO_F32:
+            LABEL(I32_TO_F32):
             {
                 auto arg0 = popInt32();
                 pushVal(Value::float32(arg0));
             }
-            break;
+            NEXT();
 
-            case I32_TO_STR:
+            LABEL(I32_TO_STR):
             {
                 auto arg0 = popInt32();
                 String str = std::to_string(arg0);
                 pushVal(str);
             }
-            break;
+            NEXT();
 
-            case F32_TO_I32:
+            LABEL(F32_TO_I32):
             {
                 auto arg0 = popFloat32();
                 pushVal(Value::int32(arg0));
             }
-            break;
+            NEXT();
 
-            case F32_TO_STR:
+            LABEL(F32_TO_STR):
             {
                 auto arg0 = popFloat32();
                 String str = std::to_string(arg0);
                 pushVal(str);
             }
-            break;
+            NEXT();
 
-            case STR_TO_F32:
+            LABEL(STR_TO_F32):
             {
                 auto arg0 = popStr();
 
@@ -1606,51 +1615,51 @@ Value execCode()
 
                 pushVal(Value::float32(val));
             }
-            break;
+            NEXT();
 
             //
             // Misc operations
             //
 
-            case EQ_BOOL:
+            LABEL(EQ_BOOL):
             {
                 auto arg1 = popBool();
                 auto arg0 = popBool();
                 pushBool(arg0 == arg1);
             }
-            break;
+            NEXT();
 
             // Test if a value has a given tag
-            case HAS_TAG:
+            LABEL(HAS_TAG):
             {
                 auto testTag = readCode<Tag>();
                 auto valTag = popVal().getTag();
                 pushBool(valTag == testTag);
             }
-            break;
+            NEXT();
 
             // Get the type tag associated with a value.
             // Note: this produces a string
-            case GET_TAG:
+            LABEL(GET_TAG):
             {
                 auto valTag = popVal().getTag();
                 auto tagStr = tagToStr(valTag);
                 pushVal(String(tagStr));
             }
-            break;
+            NEXT();
 
             //
             // String operations
             //
 
-            case STR_LEN:
+            LABEL(STR_LEN):
             {
                 auto str = popStr();
                 pushVal(Value::int32(str.length()));
             }
-            break;
+            NEXT();
 
-            case GET_CHAR:
+            LABEL(GET_CHAR):
             {
                 auto idx = (size_t)popInt32();
                 auto str = popStr();
@@ -1672,9 +1681,9 @@ Value execCode()
 
                 pushVal(charStrings[ch]);
             }
-            break;
+            NEXT();
 
-            case GET_CHAR_CODE:
+            LABEL(GET_CHAR_CODE):
             {
                 auto idx = (size_t)popInt32();
                 auto str = popStr();
@@ -1688,67 +1697,67 @@ Value execCode()
 
                 pushVal(Value::int32(str[idx]));
             }
-            break;
+            NEXT();
 
-            case CHAR_TO_STR:
+            LABEL(CHAR_TO_STR):
             {
                 auto charCode = (char)popInt32();
                 char buf[2] = { (char)charCode, '\0' };
                 pushVal(String(buf));
             }
-            break;
+            NEXT();
 
-            case STR_CAT:
+            LABEL(STR_CAT):
             {
                 auto a = popStr();
                 auto b = popStr();
                 auto c = String::concat(b, a);
                 pushVal(c);
             }
-            break;
+            NEXT();
 
-            case EQ_STR:
+            LABEL(EQ_STR):
             {
                 auto arg1 = popStr();
                 auto arg0 = popStr();
                 pushBool(arg0 == arg1);
             }
-            break;
+            NEXT();
 
             //
             // Object operations
             //
 
-            case NEW_OBJECT:
+            LABEL(NEW_OBJECT):
             {
                 auto capacity = popInt32();
                 auto obj = Object::newObject(capacity);
                 pushVal(obj);
             }
-            break;
+            NEXT();
 
-            case HAS_FIELD:
+            LABEL(HAS_FIELD):
             {
                 auto fieldName = popStr();
                 auto obj = popObj();
                 pushBool(obj.hasField(fieldName));
             }
-            break;
+            NEXT();
 
-            case SET_FIELD:
+            LABEL(SET_FIELD):
             {
                 auto val = popVal();
                 auto fieldName = popStr();
                 auto obj = popObj();
                 obj.setField(fieldName, val);
             }
-            break;
+            NEXT();
 
             // This instruction will abort execution if trying to
             // access a field that is not present on an object.
             // The running program is responsible for testing that
             // fields exist before attempting to read them.
-            case GET_FIELD:
+            LABEL(GET_FIELD):
             {
                 auto fieldName = popStr();
                 auto obj = popObj();
@@ -1768,9 +1777,9 @@ Value execCode()
 
                 pushVal(val);
             }
-            break;
+            NEXT();
 
-            case GET_FIELD_LIST:
+            LABEL(GET_FIELD_LIST):
             {
                 Value arg0 = popVal();
                 Array array = Array(0);
@@ -1781,44 +1790,44 @@ Value execCode()
                 }
                 pushVal(array);
             }
-            break;
+            NEXT();
 
-            case EQ_OBJ:
+            LABEL(EQ_OBJ):
             {
                 Value arg1 = popVal();
                 Value arg0 = popVal();
                 pushBool(arg0 == arg1);
             }
-            break;
+            NEXT();
 
             //
             // Array operations
             //
 
-            case NEW_ARRAY:
+            LABEL(NEW_ARRAY):
             {
                 auto len = popInt32();
                 auto array = Array(len);
                 pushVal(array);
             }
-            break;
+            NEXT();
 
-            case ARRAY_LEN:
+            LABEL(ARRAY_LEN):
             {
                 auto arr = Array(popVal());
                 pushVal(Value::int32(arr.length()));
             }
-            break;
+            NEXT();
 
-            case ARRAY_PUSH:
+            LABEL(ARRAY_PUSH):
             {
                 auto val = popVal();
                 auto arr = Array(popVal());
                 arr.push(val);
             }
-            break;
+            NEXT();
 
-            case SET_ELEM:
+            LABEL(SET_ELEM):
             {
                 auto val = popVal();
                 auto idx = (size_t)popInt32();
@@ -1833,9 +1842,9 @@ Value execCode()
 
                 arr.setElem(idx, val);
             }
-            break;
+            NEXT();
 
-            case GET_ELEM:
+            LABEL(GET_ELEM):
             {
                 auto idx = (size_t)popInt32();
                 auto arr = Array(popVal());
@@ -1849,13 +1858,13 @@ Value execCode()
 
                 pushVal(arr.getElem(idx));
             }
-            break;
+            NEXT();
 
             //
             // Branch instructions
             //
 
-            case JUMP_STUB:
+            LABEL(JUMP_STUB):
             {
                 auto& dstAddr = readCode<uint8_t*>();
 
@@ -1886,16 +1895,16 @@ Value execCode()
                     instrPtr = dstVer->startPtr;
                 }
             }
-            break;
+            NEXT();
 
-            case JUMP:
+            LABEL(JUMP):
             {
                 auto& dstAddr = readCode<uint8_t*>();
                 instrPtr = dstAddr;
             }
-            break;
+            NEXT();
 
-            case IF_TRUE:
+            LABEL(IF_TRUE):
             {
                 auto& thenAddr = readCode<uint8_t*>();
                 auto& elseAddr = readCode<uint8_t*>();
@@ -1935,10 +1944,10 @@ Value execCode()
                     instrPtr = elseAddr;
                 }
             }
-            break;
+            NEXT();
 
             // Regular function call
-            case CALL:
+            LABEL(CALL):
             {
                 auto& callInfo = readCode<CallInfo>();
 
@@ -1973,9 +1982,9 @@ Value execCode()
                   throw RunError("invalid callee at call site");
                 }
             }
-            break;
+            NEXT();
 
-            case RET:
+            LABEL(RET):
             {
                 // TODO: figure out callee identity from version,
                 // caller identity from return address
@@ -2020,26 +2029,26 @@ Value execCode()
                     instrPtr = retVer->startPtr;
                 }
             }
-            break;
+            NEXT();
 
             // Throw an exception
-            case THROW:
+            LABEL(THROW):
             {
                 // Pop the exception value
                 auto excVal = popVal();
                 throwExc((uint8_t*)&op, excVal);
             }
-            break;
+            NEXT();
 
-            case IMPORT:
+            LABEL(IMPORT):
             {
                 auto pkgName = (std::string)popVal();
                 auto pkg = import(pkgName);
                 pushVal(pkg);
             }
-            break;
+            NEXT();
 
-            case ABORT:
+            LABEL(ABORT):
             {
                 auto errMsg = (std::string)popStr();
 
@@ -2059,7 +2068,7 @@ Value execCode()
 
                 exit(-1);
             }
-            break;
+            NEXT();
 
             default:
             assert (false && "unhandled instruction in interpreter loop");
